@@ -48,7 +48,7 @@ else:
     
     # Lettura dinamica del ruolo direttamente dal record dell'utente nel DB
     try:
-        res_profile = supabase.table("allowed_users").select("first_name, last_name, role").eq("id", current_user.id).execute().data
+        res_profile = supabase.table("allowed_users").select("first_name, last_name, role").eq("email", current_user.email).execute().data
         if res_profile and len(res_profile) > 0:
             profilo = res_profile[0]
             ruolo_utente = str(profilo.get("role", "user")).lower()
