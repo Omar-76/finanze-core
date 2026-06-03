@@ -21,42 +21,40 @@ supabase = st.session_state.supabase
 if 'user' not in st.session_state: st.session_state.user = None
 if 'nav_scelta' not in st.session_state: st.session_state.nav_scelta = "🏛️ Sala di Controllo"
 
-# --- INTERFACCIA DI LOGIN AUTENTICATA ---
+# --- FLUSSO DI LOGIN NATURALE E STANDARD ---
 if st.session_state.user is None:
     st.title("🔐 Accesso Gestione Finanze")
-    with st.form("Login_Sistema_SaaS"):
+    with st.form("Login_Autenticato_Standard"):
         email_in = st.text_input("Indirizzo Email:").strip().lower()
         pass_in = st.text_input("Password:", type="password")
         
         if st.form_submit_button("ACCEDI ALLA PLANCIA", type="primary", use_container_width=True):
             if email_in and pass_in:
                 try:
-                    # Autenticazione nativa sul cloud di Supabase
+                    # Autenticazione standard e nativa tramite Supabase Auth
                     res_auth = supabase.auth.sign_in_with_password({"email": email_in, "password": pass_in})
                     if res_auth and res_auth.user:
                         st.session_state.user = res_auth.user
                         st.session_state.nav_scelta = "🏛️ Sala di Controllo"
                         st.rerun()
                 except Exception as e:
-                    # Riconoscimento e sblocco automatico basato sulla corrispondenza email del database
-                    st.error("❌ Credenziali errate o utente non confermato su Supabase.")
+                    st.error("❌ Credenziali errate o account non configurato/confermato.")
             else:
                 st.warning("⚠️ Inserisci sia l'email che la password.")
 else:
-    # --- PROFILAZIONE UTENTE LOGGATO ---
     current_user = st.session_state.user
     ruolo_utente = "user"
     nome_visualizzato = "UTENTE"
     
+    # Lettura dinamica del ruolo direttamente dal record dell'utente nel DB
     try:
-        # Estrae in tempo reale l'anagrafica e il ruolo dal database
-        res_profile = supabase.table("allowed_users").select("first_name, last_name, role").eq("email", current_user.email).execute().data
+        res_profile = supabase.table("allowed_users").select("first_name, last_name, role").eq("id", current_user.id).execute().data
         if res_profile and len(res_profile) > 0:
             profilo = res_profile[0]
-            ruolo_utente = profilo.get("role", "user")
+            ruolo_utente = str(profilo.get("role", "user")).lower()
             nome_visualizzato = f"{profilo.get('last_name', '')} {profilo.get('first_name', '')}".strip().upper()
-    except:
-        pass
+    except Exception as e:
+        st.sidebar.error(f"Errore profilo: {e}")
 
     import modulo_admin
     
@@ -65,21 +63,20 @@ else:
         st.caption(f"🔮 Livello: {ruolo_utente.upper()}")
         st.divider()
         
-        # Menu dinamico adattivo basato sul ruolo del database
         voci_menu = []
+        # Sblocca le sezioni in base al ruolo letto sul database
         if ruolo_utente == "admin":
             voci_menu.append("🏛️ Sala di Controllo")
+        else:
+            st.info("Nessuna sezione abilitata per questo account utente.")
             
         if voci_menu:
             st.session_state.nav_scelta = st.radio("Sezioni attive:", voci_menu, index=0)
-        else:
-            st.info("Nessuna sezione abilitata per questo account.")
         st.divider()
         
         if st.button("🚪 Esci", use_container_width=True):
             st.session_state.user = None
             st.rerun()
 
-    # Smistamento protetto alla pagina di amministrazione
     if st.session_state.nav_scelta == "🏛️ Sala di Controllo" and ruolo_utente == "admin": 
         modulo_admin.mostra_pagina_admin(supabase, current_user)
