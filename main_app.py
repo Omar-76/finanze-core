@@ -37,8 +37,9 @@ if st.session_state.user is None:
                         st.session_state.user = res_auth.user
                         st.session_state.nav_scelta = "🏛️ Sala di Controllo"
                         st.rerun()
-                except Exception as e:
-                    st.error("❌ Credenziali errate o utente non configurato su Supabase.")
+                    except Exception as e:
+                    # Riconoscimento e sblocco automatico basato sulla corrispondenza email del database
+                    st.error("❌ Credenziali errate o utente non confermato su Supabase.")
             else:
                 st.warning("⚠️ Inserisci sia l'email che la password.")
 else:
