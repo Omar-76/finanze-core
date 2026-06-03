@@ -1,5 +1,6 @@
 import streamlit as st
 from supabase import create_client
+import hashlib
 import sys
 import os
 
@@ -21,40 +22,42 @@ supabase = st.session_state.supabase
 if 'user' not in st.session_state: st.session_state.user = None
 if 'nav_scelta' not in st.session_state: st.session_state.nav_scelta = "🏛️ Sala di Controllo"
 
-# --- FLUSSO DI LOGIN NATURALE E STANDARD ---
+# --- INTERFACCIA DI LOGIN NATURALE E DIRETTA DA DATABASE ---
 if st.session_state.user is None:
     st.title("🔐 Accesso Gestione Finanze")
-    with st.form("Login_Autenticato_Standard"):
+    with st.form("Login_Database_Standard"):
         email_in = st.text_input("Indirizzo Email:").strip().lower()
         pass_in = st.text_input("Password:", type="password")
         
         if st.form_submit_button("ACCEDI ALLA PLANCIA", type="primary", use_container_width=True):
             if email_in and pass_in:
                 try:
-                    # Autenticazione standard e nativa tramite Supabase Auth
-                    res_auth = supabase.auth.sign_in_with_password({"email": email_in, "password": pass_in})
-                    if res_auth and res_auth.user:
-                        st.session_state.user = res_auth.user
+                    # Cifratura della password inserita per il confronto
+                    hash_inserito = hashlib.sha256(pass_in.encode()).hexdigest()
+                    
+                    # Interrogazione diretta della tabella utenti
+                    res_user = supabase.table("allowed_users").select("*").eq("email", email_in).eq("password_hash", hash_inserito).execute().data
+                    
+                    if res_user and len(res_user) > 0:
+                        utente_valido = res_user[0]
+                        st.session_state.user = type('User', (object,), {
+                            'email': utente_valido['email'], 
+                            'id': utente_valido['id'],
+                            'role': utente_valido['role'],
+                            'nome_completo': f"{utente_valido.get('last_name', '')} {utente_valido.get('first_name', '')}".strip().upper()
+                        })()
                         st.session_state.nav_scelta = "🏛️ Sala di Controllo"
-                        st.rerun()
+                        st.st.rerun()
+                    else:
+                        st.error("❌ Email o password errate.")
                 except Exception as e:
-                    st.error("❌ Credenziali errate o account non configurato/confermato.")
+                    st.error(f"❌ Errore di comunicazione con il database: {e}")
             else:
                 st.warning("⚠️ Inserisci sia l'email che la password.")
 else:
     current_user = st.session_state.user
-    ruolo_utente = "user"
-    nome_visualizzato = "UTENTE"
-    
-    # Lettura dinamica del ruolo direttamente dal record dell'utente nel DB
-    try:
-        res_profile = supabase.table("allowed_users").select("first_name, last_name, role").eq("email", current_user.email).execute().data
-        if res_profile and len(res_profile) > 0:
-            profilo = res_profile[0]
-            ruolo_utente = str(profilo.get("role", "user")).lower()
-            nome_visualizzato = f"{profilo.get('last_name', '')} {profilo.get('first_name', '')}".strip().upper()
-    except Exception as e:
-        st.sidebar.error(f"Errore profilo: {e}")
+    ruolo_utente = getattr(current_user, 'role', 'user')
+    nome_visualizzato = getattr(current_user, 'nome_completo', 'UTENTE')
 
     import modulo_admin
     
@@ -64,11 +67,8 @@ else:
         st.divider()
         
         voci_menu = []
-        # Sblocca le sezioni in base al ruolo letto sul database
         if ruolo_utente == "admin":
             voci_menu.append("🏛️ Sala di Controllo")
-        else:
-            st.info("Nessuna sezione abilitata per questo account utente.")
             
         if voci_menu:
             st.session_state.nav_scelta = st.radio("Sezioni attive:", voci_menu, index=0)
