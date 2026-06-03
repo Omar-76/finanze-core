@@ -47,7 +47,7 @@ if st.session_state.user is None:
                             'nome_completo': f"{utente_valido.get('last_name', '')} {utente_valido.get('first_name', '')}".strip().upper()
                         })()
                         st.session_state.nav_scelta = "🏛️ Sala di Controllo"
-                        st.st.rerun()
+                        st.rerun()
                     else:
                         st.error("❌ Email o password errate.")
                 except Exception as e:
