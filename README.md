@@ -1,0 +1,2 @@
+# finanze-core
+GestioneConti
